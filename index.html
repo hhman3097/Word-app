@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>单词卡片 v4.0</title>
+    <title>单词卡片 v4.1</title>
     <style>
         :root {
             --primary: #2563eb;
@@ -30,7 +30,6 @@
 
         button { border: none; outline: none; cursor: pointer; font-family: inherit; }
 
-        /* 视图切换 */
         .view { display: none; flex: 1; flex-direction: column; height: 100%; overflow: hidden; }
         .view.active { display: flex; }
 
@@ -63,17 +62,8 @@
         .card-front { z-index: 2; }
         .card-back { transform: rotateY(180deg); justify-content: space-between; padding: 40px 30px; }
 
-        /* 卡片内容样式 */
         .word { font-size: 2.2rem; font-weight: 800; margin-bottom: 8px; color: var(--text-main); word-break: break-word; line-height: 1.1; }
-        
-        /* 新增：音标样式 */
-        .phonetic { 
-            font-family: "Lucida Sans Unicode", "Arial Unicode MS", sans-serif; 
-            font-size: 1.1rem; 
-            color: var(--text-sub); 
-            margin-bottom: 20px; 
-            font-weight: 400;
-        }
+        .phonetic { font-family: "Lucida Sans Unicode", "Arial Unicode MS", sans-serif; font-size: 1.1rem; color: var(--text-sub); margin-bottom: 20px; font-weight: 400; }
 
         .definition { font-size: 1.3rem; font-weight: 600; color: var(--text-main); margin-top: 10px; }
         .sentence-box { background: #f8fafc; padding: 16px; border-radius: 12px; width: 100%; text-align: left; font-style: italic; color: #475569; font-size: 0.95rem; }
@@ -122,7 +112,6 @@
             <div class="card-face card-front">
                 <div class="word" id="front-word">Ready?</div>
                 <div class="phonetic" id="front-phonetic"></div>
-                
                 <button class="phonetic-btn" onclick="playAudio(event)">🔊 发音</button>
                 <div style="font-size:0.8rem; color:#94a3b8; margin-top:auto">点击翻面</div>
             </div>
@@ -205,7 +194,8 @@
             } catch (e) { initEmpty(); }
         } else { initEmpty(); }
         renderHome();
-        window.speechSynthesis.getVoices();
+        // 尝试提前“热身”语音引擎（解决部分机型首次发音延迟）
+        if(window.speechSynthesis) window.speechSynthesis.getVoices();
     };
 
     function initEmpty() {
@@ -284,7 +274,6 @@
         const item = studyQueue[currentCardIndex];
         
         document.getElementById('front-word').textContent = item.word;
-        // 显示音标，如果没有则留空
         document.getElementById('front-phonetic').textContent = item.phonetic || "";
         
         document.getElementById('back-word').textContent = item.word;
@@ -304,17 +293,27 @@
         if(isFlipped) playAudio();
     }
 
+    // --- 核心修复：发音逻辑优化 ---
     function playAudio(e) {
         if(e) e.stopPropagation();
         if (studyQueue.length === 0) return;
+
+        // 1. 强制停止上一个音频，防止队列堆积
+        window.speechSynthesis.cancel();
+
         const text = studyQueue[currentCardIndex].word;
-        const utterance = new SpeechSynthesisUtterance(text);
+        // 2. 技巧：在单词前加一个空格，让手机扬声器有时间完成“淡入”过程，防止吞掉第一个音节
+        const utterance = new SpeechSynthesisUtterance(" " + text);
+
         const voices = window.speechSynthesis.getVoices();
         const usVoice = voices.find(v => v.lang === 'en-US');
         if (usVoice) utterance.voice = usVoice;
         utterance.rate = 0.9;
-        window.speechSynthesis.cancel();
-        window.speechSynthesis.speak(utterance);
+        
+        // 3. 技巧：设置一个微小的延迟(50ms)，确保 cancel() 命令已完全执行且音频通道已打开
+        setTimeout(() => {
+            window.speechSynthesis.speak(utterance);
+        }, 50);
     }
 
     function nextCard(known) {
@@ -322,7 +321,11 @@
         if (!known) studyQueue.push(studyQueue[currentCardIndex]);
         currentCardIndex = (currentCardIndex + 1) % studyQueue.length;
         renderCard();
-        setTimeout(() => { if(!isFlipped) playAudio(null); }, 300);
+        
+        // 自动播放时也加入稍长的延迟
+        setTimeout(() => { 
+            if(!isFlipped) playAudio(null); 
+        }, 400); 
     }
 
     function openImportModal() {
