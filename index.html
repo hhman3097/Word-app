@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>单词卡片 v6.0</title>
+    <title>单词卡片 v7.0</title>
     <style>
         :root {
             --primary: #2563eb;
@@ -47,7 +47,6 @@
         .folder-info { flex: 1; }
         .folder-info h3 { font-size: 1.1rem; margin-bottom: 4px; }
         .folder-info p { font-size: 0.85rem; color: var(--text-sub); }
-        /* 进度条 */
         .progress-bar-bg { width: 100%; height: 4px; background: #f1f5f9; border-radius: 2px; margin-top: 8px; overflow: hidden; }
         .progress-bar-fill { height: 100%; background: var(--green); border-radius: 2px; width: 0%; transition: width 0.3s; }
 
@@ -80,18 +79,10 @@
         .definition { font-size: 1.3rem; font-weight: 600; color: var(--text-main); margin-top: 10px; }
         .sentence-box { background: #f8fafc; padding: 16px; border-radius: 12px; width: 100%; text-align: left; font-style: italic; color: #475569; font-size: 0.95rem; }
         .phonetic-btn { background: #eff6ff; color: var(--primary); padding: 8px 16px; border-radius: 20px; font-size: 0.9rem; font-weight: 600; display: flex; align-items: center; gap: 6px; margin-top: 10px; }
-        
-        /* 进度指示器 */
         .progress-indicator { position: absolute; top: 20px; right: 20px; font-size: 0.8rem; color: #cbd5e1; font-weight: 600; }
 
         .controls-area { padding: 10px 30px 40px; width: 100%; max-width: 400px; margin: 0 auto; display: flex; flex-direction: column; gap: 15px;}
-        
-        /* 撤销按钮 */
-        .undo-btn { 
-            align-self: center; background: none; color: var(--text-sub); 
-            font-size: 0.9rem; display: flex; align-items: center; gap: 5px; padding: 5px 10px;
-        }
-
+        .undo-btn { align-self: center; background: none; color: var(--text-sub); font-size: 0.9rem; display: flex; align-items: center; gap: 5px; padding: 5px 10px; }
         .main-actions { display: flex; gap: 20px; width: 100%; }
         .ctrl-btn { flex: 1; padding: 16px; border-radius: 16px; font-size: 1rem; font-weight: 700; color: white; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); transition: transform 0.1s; }
         .ctrl-btn:active { transform: scale(0.96); }
@@ -154,7 +145,6 @@
 
     <div class="controls-area">
         <button class="undo-btn" onclick="prevCard()">↩️ 上一个 / 撤销</button>
-        
         <div class="main-actions">
             <button class="ctrl-btn btn-fail" onclick="nextCard(false)">✕ 忘词</button>
             <button class="ctrl-btn btn-pass" onclick="nextCard(true)">✓ 记住了</button>
@@ -230,7 +220,6 @@
             try {
                 const parsed = JSON.parse(raw);
                 if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].hasOwnProperty('word') && !parsed[0].hasOwnProperty('words')) {
-                    // 迁移旧数据
                     appData = [{ id: 'default-' + Date.now(), name: '默认生词本', words: parsed, currentIndex: 0 }];
                     saveToLocal();
                 } else if (Array.isArray(parsed)) {
@@ -246,12 +235,8 @@
         appData = [{ id: 'folder-1', name: '我的生词本', words: [], currentIndex: 0 }];
         saveToLocal();
     }
+    function saveToLocal() { localStorage.setItem('myWords', JSON.stringify(appData)); }
 
-    function saveToLocal() {
-        localStorage.setItem('myWords', JSON.stringify(appData));
-    }
-
-    // --- 首页渲染 ---
     function renderHome() {
         const list = document.getElementById('folderList');
         list.innerHTML = '';
@@ -264,8 +249,6 @@
             const div = document.createElement('div');
             div.className = 'folder-card';
             div.onclick = () => openFolder(folder.id);
-            
-            // 计算进度百分比
             const currentIdx = folder.currentIndex || 0;
             const total = folder.words.length;
             const percent = total > 0 ? Math.round((currentIdx / total) * 100) : 0;
@@ -274,9 +257,7 @@
                 <div class="folder-info">
                     <h3>📁 ${folder.name}</h3>
                     <p>${currentIdx} / ${total} 个单词</p>
-                    <div class="progress-bar-bg">
-                        <div class="progress-bar-fill" style="width: ${percent}%"></div>
-                    </div>
+                    <div class="progress-bar-bg"><div class="progress-bar-fill" style="width: ${percent}%"></div></div>
                 </div>
                 <div class="folder-actions">
                     <button class="more-btn" onclick="openFolderOptions('${folder.id}', '${folder.name}', event)">⋮</button>
@@ -287,69 +268,26 @@
         });
     }
 
-    // --- 文件夹操作 ---
-    function openFolderOptions(id, name, event) {
-        event.stopPropagation();
-        targetFolderId = id;
-        document.getElementById('optFolderName').textContent = name;
-        document.getElementById('modalFolderOptions').classList.add('open');
-    }
-
-    function deleteSingleFolder() {
-        if (!targetFolderId) return;
-        if (confirm("确定要删除这个文件夹吗？")) {
-            appData = appData.filter(f => f.id !== targetFolderId);
-            saveToLocal();
-            renderHome();
-            closeModal('modalFolderOptions');
-        }
-    }
-
-    function resetFolderProgress() {
-        if (!targetFolderId) return;
-        const folder = appData.find(f => f.id === targetFolderId);
-        if(folder) {
-            folder.currentIndex = 0;
-            saveToLocal();
-            renderHome();
-            alert("进度已重置");
-            closeModal('modalFolderOptions');
-        }
-    }
-
-    function exportSingleFolder() {
-        if (!targetFolderId) return;
-        const folder = appData.find(f => f.id === targetFolderId);
-        if (!folder) return;
-        downloadFile(JSON.stringify(folder.words, null, 2), `${folder.name}_words.json`);
-        closeModal('modalFolderOptions');
-    }
-
-    // --- 核心学习逻辑 (v6.0 进度记忆) ---
     function openFolder(id) {
         currentFolderId = id;
         const folder = appData.find(f => f.id === id);
         if(!folder) return;
-
         document.getElementById('view-home').classList.remove('active');
         document.getElementById('view-study').classList.add('active');
         document.getElementById('currentFolderName').textContent = folder.name;
-        
         studyQueue = [...folder.words];
-        // 读取保存的进度，如果越界则归零
+        // 恢复进度
         currentCardIndex = (folder.currentIndex && folder.currentIndex < studyQueue.length) ? folder.currentIndex : 0;
-
         if (studyQueue.length === 0) showEmptyCard();
         else renderCard();
     }
 
     function goHome() {
-        // 离开时保存当前进度到对象中
         saveCurrentProgress();
         document.getElementById('view-study').classList.remove('active');
         document.getElementById('view-home').classList.add('active');
         currentFolderId = null;
-        renderHome(); // 刷新进度条
+        renderHome();
     }
 
     function saveCurrentProgress() {
@@ -363,10 +301,7 @@
 
     function renderCard() {
         if (studyQueue.length === 0) { showEmptyCard(); return; }
-        
-        // 渲染进度数字
         document.getElementById('progressText').textContent = `${currentCardIndex + 1} / ${studyQueue.length}`;
-
         const item = studyQueue[currentCardIndex];
         document.getElementById('front-word').textContent = item.word;
         document.getElementById('front-phonetic').textContent = item.phonetic || "";
@@ -374,36 +309,27 @@
         document.getElementById('back-phonetic').textContent = item.phonetic || "";
         document.getElementById('back-def').textContent = item.definition;
         document.getElementById('back-sentence').textContent = item.sentence;
-        
         isFlipped = false;
         document.getElementById('flashcard').classList.remove('is-flipped');
     }
 
-    // --- 翻页控制 (v6.0) ---
+    // --- 翻页与撤销 ---
     function nextCard(known) {
         if (studyQueue.length === 0) return;
-        
-        // 如果已是最后一张
         if (currentCardIndex >= studyQueue.length - 1) {
-            if(confirm("恭喜！本组单词已学完。是否从头再来？")) {
-                currentCardIndex = 0;
-            } else {
-                return;
-            }
+            if(confirm("恭喜！本组单词已学完。是否从头再来？")) currentCardIndex = 0;
+            else return;
         } else {
             currentCardIndex++;
         }
-
-        saveCurrentProgress(); // 每次切词都保存，防止意外关闭
+        saveCurrentProgress();
         renderCard();
-        
+        // 延时读音，避免切换过快
         setTimeout(() => { if(!isFlipped) playAudio(null); }, 400); 
     }
 
-    // 新增：上一个/撤销功能
     function prevCard() {
         if (studyQueue.length === 0) return;
-        
         if (currentCardIndex > 0) {
             currentCardIndex--;
             saveCurrentProgress();
@@ -421,7 +347,7 @@
         if(isFlipped) playAudio();
     }
 
-    // --- 终极防吞音策略 (3逗号 + 150ms) ---
+    // --- 终极防吞音策略 v7.0 (牺牲音 + 强延时) ---
     function playAudio(e) {
         if(e) e.stopPropagation();
         if (studyQueue.length === 0) return;
@@ -430,22 +356,62 @@
         
         const text = studyQueue[currentCardIndex].word;
         
-        // 技巧：",,," 会强制语音引擎停顿，等于给硬件留出了“热身”时间
-        // 比单纯的空格更有效
-        const utterance = new SpeechSynthesisUtterance(",,," + text);
+        // 步骤1：制造一个极短的“牺牲音”，用 "t" 这个辅音来激活硬件
+        // Volume 0.1 避免太吵，Rate 10 极速闪过
+        const dummy = new SpeechSynthesisUtterance("t");
+        dummy.volume = 0.1;
+        dummy.rate = 10; 
         
+        // 步骤2：真正的单词
+        const real = new SpeechSynthesisUtterance(text);
         const voices = window.speechSynthesis.getVoices();
         const usVoice = voices.find(v => v.lang === 'en-US');
-        if (usVoice) utterance.voice = usVoice;
-        utterance.rate = 0.9;
-        
-        // 延时加长到 150ms，确保极其慵懒的手机扬声器也能醒过来
+        if (usVoice) real.voice = usVoice;
+        real.rate = 0.9;
+
+        // 步骤3：先播放牺牲音
+        window.speechSynthesis.speak(dummy);
+
+        // 步骤4：强行等待 300ms 后播放真词 (300ms 是蓝牙/硬件唤醒的安全阈值)
         setTimeout(() => {
-            window.speechSynthesis.speak(utterance);
-        }, 150);
+            window.speechSynthesis.speak(real);
+        }, 300);
     }
 
-    // --- 其他通用功能 ---
+    // --- 其他辅助功能 ---
+    function openFolderOptions(id, name, event) {
+        event.stopPropagation();
+        targetFolderId = id;
+        document.getElementById('optFolderName').textContent = name;
+        document.getElementById('modalFolderOptions').classList.add('open');
+    }
+    function resetFolderProgress() {
+        if (!targetFolderId) return;
+        const folder = appData.find(f => f.id === targetFolderId);
+        if(folder) {
+            folder.currentIndex = 0;
+            saveToLocal();
+            renderHome();
+            alert("进度已重置");
+            closeModal('modalFolderOptions');
+        }
+    }
+    function deleteSingleFolder() {
+        if (!targetFolderId) return;
+        if (confirm("确定要删除这个文件夹吗？")) {
+            appData = appData.filter(f => f.id !== targetFolderId);
+            saveToLocal();
+            renderHome();
+            closeModal('modalFolderOptions');
+        }
+    }
+    function exportSingleFolder() {
+        if (!targetFolderId) return;
+        const folder = appData.find(f => f.id === targetFolderId);
+        if (!folder) return;
+        downloadFile(JSON.stringify(folder.words, null, 2), `${folder.name}_words.json`);
+        closeModal('modalFolderOptions');
+    }
     function downloadFile(content, fileName) {
         const blob = new Blob([content], { type: "application/json" });
         const a = document.createElement('a');
@@ -453,7 +419,6 @@
         a.download = fileName;
         document.body.appendChild(a); a.click(); document.body.removeChild(a);
     }
-
     function createFolder() {
         const name = document.getElementById('newFolderName').value.trim();
         if (!name) return;
@@ -461,13 +426,11 @@
         saveToLocal();
         closeModal('modalCreateFolder');
     }
-
     function openImportModal() {
         const folder = appData.find(f => f.id === currentFolderId);
         document.getElementById('modalImport').classList.add('open');
         document.getElementById('jsonInput').value = '';
     }
-
     function importWords() {
         const input = document.getElementById('jsonInput').value;
         if(!input.trim()) return;
@@ -487,12 +450,10 @@
             saveToLocal();
             alert(`成功导入 ${added} 个新单词！`);
             studyQueue = [...folder.words];
-            // 导入后不重置 index，除非是刚建的空文件夹
             renderCard();
             closeModal('modalImport');
         } catch (e) { alert("格式错误：" + e.message); }
     }
-    
     function showEmptyCard() {
         document.getElementById('front-word').textContent = "空空如也";
         document.getElementById('front-phonetic').textContent = "";
@@ -502,7 +463,6 @@
         document.getElementById('back-sentence').textContent = "";
         document.getElementById('progressText').textContent = "0 / 0";
     }
-
     function openGlobalSettings() { document.getElementById('modalSettings').classList.add('open'); }
     function exportGlobalData() { downloadFile(JSON.stringify(appData, null, 2), `my_vocabulary_FULL.json`); }
     function clearAllData() { if(confirm("确定清空？")) { localStorage.removeItem('myWords'); location.reload(); } }
