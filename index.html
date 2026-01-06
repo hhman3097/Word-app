@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>单词卡片 v4.1</title>
+    <title>单词卡片 v5.0</title>
     <style>
         :root {
             --primary: #2563eb;
@@ -37,11 +37,25 @@
         .home-header { padding: 20px; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.05); display: flex; justify-content: space-between; align-items: center; }
         .home-title { font-size: 1.4rem; font-weight: 800; }
         .folder-list { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 12px; }
-        .folder-card { background: #fff; padding: 20px; border-radius: 16px; box-shadow: var(--shadow); display: flex; justify-content: space-between; align-items: center; transition: transform 0.1s; }
+        
+        .folder-card { 
+            background: #fff; padding: 20px; border-radius: 16px; box-shadow: var(--shadow); 
+            display: flex; justify-content: space-between; align-items: center; 
+            transition: transform 0.1s; position: relative;
+        }
         .folder-card:active { transform: scale(0.98); }
+        .folder-info { flex: 1; } /* 让文字区域占据剩余空间 */
         .folder-info h3 { font-size: 1.1rem; margin-bottom: 4px; }
         .folder-info p { font-size: 0.85rem; color: var(--text-sub); }
+        
+        /* 文件夹右侧的操作区 */
+        .folder-actions { display: flex; align-items: center; gap: 10px; }
         .folder-arrow { color: #cbd5e1; font-size: 1.2rem; }
+        .more-btn { 
+            padding: 8px 12px; font-size: 1.2rem; color: #64748b; background: #f1f5f9; 
+            border-radius: 8px; z-index: 5; 
+        }
+
         .fab { position: absolute; bottom: 30px; right: 30px; width: 56px; height: 56px; background: var(--primary); color: white; border-radius: 50%; font-size: 2rem; display: flex; justify-content: center; align-items: center; box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.4); z-index: 10; }
 
         /* 学习页样式 */
@@ -64,7 +78,6 @@
 
         .word { font-size: 2.2rem; font-weight: 800; margin-bottom: 8px; color: var(--text-main); word-break: break-word; line-height: 1.1; }
         .phonetic { font-family: "Lucida Sans Unicode", "Arial Unicode MS", sans-serif; font-size: 1.1rem; color: var(--text-sub); margin-bottom: 20px; font-weight: 400; }
-
         .definition { font-size: 1.3rem; font-weight: 600; color: var(--text-main); margin-top: 10px; }
         .sentence-box { background: #f8fafc; padding: 16px; border-radius: 12px; width: 100%; text-align: left; font-style: italic; color: #475569; font-size: 0.95rem; }
         .phonetic-btn { background: #eff6ff; color: var(--primary); padding: 8px 16px; border-radius: 20px; font-size: 0.9rem; font-weight: 600; display: flex; align-items: center; gap: 6px; margin-top: 10px; }
@@ -86,6 +99,7 @@
         .btn-block { width: 100%; padding: 14px; border-radius: 12px; font-weight: 600; margin-bottom: 10px; font-size: 1rem; }
         .btn-primary { background: var(--primary); color: white; }
         .btn-outline { background: transparent; border: 1px solid #cbd5e1; color: var(--text-sub); }
+        .btn-danger-outline { background: transparent; border: 1px solid #fecaca; color: var(--red); }
         .empty-state { text-align: center; color: #94a3b8; margin-top: 100px; }
     </style>
 </head>
@@ -144,6 +158,20 @@
     </div>
 </div>
 
+<div class="modal" id="modalFolderOptions" onclick="if(event.target===this) closeModal('modalFolderOptions')">
+    <div class="modal-content">
+        <div class="modal-header">
+            <div class="modal-title">管理: <span id="optFolderName"></span></div>
+            <button onclick="closeModal('modalFolderOptions')" style="font-size:1.5rem;background:none">×</button>
+        </div>
+        <p style="font-size:0.9rem; color:#64748b; margin-bottom:15px">对该生词本进行操作：</p>
+        
+        <button class="btn-block btn-primary" onclick="exportSingleFolder()">⬇️ 导出本文件夹 (JSON)</button>
+        <div style="height:10px"></div>
+        <button class="btn-block btn-danger-outline" onclick="deleteSingleFolder()">🗑️ 删除本文件夹</button>
+    </div>
+</div>
+
 <div class="modal" id="modalImport" onclick="if(event.target===this) closeModal('modalImport')">
     <div class="modal-content">
         <div class="modal-header">
@@ -151,7 +179,7 @@
             <button onclick="closeModal('modalImport')" style="font-size:1.5rem;background:none">×</button>
         </div>
         <p style="font-size:0.9rem; color:#64748b; margin-bottom:10px">粘贴包含音标的 JSON：</p>
-        <textarea id="jsonInput" placeholder='[{"word":"example", "phonetic":"/ɪɡˈzæmpəl/", "definition":"例子", "sentence":"..."}]'></textarea>
+        <textarea id="jsonInput" placeholder='[{"word":"example", "phonetic":"/ex/", "definition":"...", "sentence":"..."}]'></textarea>
         <button class="btn-block btn-primary" onclick="importWords()">确认导入</button>
     </div>
 </div>
@@ -159,16 +187,16 @@
 <div class="modal" id="modalSettings" onclick="if(event.target===this) closeModal('modalSettings')">
     <div class="modal-content">
         <div class="modal-header">
-            <div class="modal-title">设置与备份</div>
+            <div class="modal-title">设置与全局备份</div>
             <button onclick="closeModal('modalSettings')" style="font-size:1.5rem;background:none">×</button>
         </div>
         <div style="margin-bottom:20px;">
-            <p style="font-weight:600; margin-bottom:10px">数据备份</p>
-            <button class="btn-block btn-primary" onclick="exportData()">⬇️ 导出数据 (JSON)</button>
+            <p style="font-weight:600; margin-bottom:10px">全局数据备份</p>
+            <button class="btn-block btn-primary" onclick="exportGlobalData()">⬇️ 导出所有文件夹 (完整备份)</button>
         </div>
         <div style="margin-top:20px; border-top:1px solid #eee; padding-top:20px;">
              <p style="font-weight:600; margin-bottom:10px">危险区域</p>
-             <button class="btn-block btn-outline" style="color:var(--red); border-color:var(--red)" onclick="clearAllData()">🗑️ 清空所有数据</button>
+             <button class="btn-block btn-outline" style="color:var(--red); border-color:var(--red)" onclick="clearAllData()">🗑️ 清空所有数据 (Reset)</button>
         </div>
     </div>
 </div>
@@ -176,6 +204,7 @@
 <script>
     let appData = [];
     let currentFolderId = null;
+    let targetFolderId = null; // 用于存储正在操作(删除/导出)的文件夹ID
     let studyQueue = [];
     let currentCardIndex = 0;
     let isFlipped = false;
@@ -194,7 +223,6 @@
             } catch (e) { initEmpty(); }
         } else { initEmpty(); }
         renderHome();
-        // 尝试提前“热身”语音引擎（解决部分机型首次发音延迟）
         if(window.speechSynthesis) window.speechSynthesis.getVoices();
     };
 
@@ -208,6 +236,7 @@
         renderHome();
     }
 
+    // --- 首页逻辑 (更新) ---
     function renderHome() {
         const list = document.getElementById('folderList');
         list.innerHTML = '';
@@ -215,24 +244,64 @@
             list.innerHTML = `<div class="empty-state">还没有文件夹，点击右下角 + 创建</div>`;
             return;
         }
+        
         appData.forEach(folder => {
             const div = document.createElement('div');
             div.className = 'folder-card';
+            // 点击整个卡片打开文件夹
             div.onclick = () => openFolder(folder.id);
+            
             div.innerHTML = `
-                <div class="folder-info"><h3>📁 ${folder.name}</h3><p>${folder.words.length} 个单词</p></div>
-                <div class="folder-arrow">›</div>
+                <div class="folder-info">
+                    <h3>📁 ${folder.name}</h3>
+                    <p>${folder.words.length} 个单词</p>
+                </div>
+                <div class="folder-actions">
+                    <button class="more-btn" onclick="openFolderOptions('${folder.id}', '${folder.name}', event)">⋮</button>
+                    <div class="folder-arrow">›</div>
+                </div>
             `;
             list.appendChild(div);
         });
     }
 
-    function openCreateFolder() {
-        document.getElementById('modalCreateFolder').classList.add('open');
-        document.getElementById('newFolderName').value = '';
-        document.getElementById('newFolderName').focus();
+    // --- 单文件夹操作逻辑 (新增) ---
+    function openFolderOptions(id, name, event) {
+        event.stopPropagation(); // 关键：阻止进入文件夹
+        targetFolderId = id;
+        document.getElementById('optFolderName').textContent = name;
+        document.getElementById('modalFolderOptions').classList.add('open');
     }
 
+    function deleteSingleFolder() {
+        if (!targetFolderId) return;
+        if (confirm("确定要删除这个文件夹吗？里面的单词也会消失。")) {
+            appData = appData.filter(f => f.id !== targetFolderId);
+            saveToLocal();
+            closeModal('modalFolderOptions');
+        }
+    }
+
+    function exportSingleFolder() {
+        if (!targetFolderId) return;
+        const folder = appData.find(f => f.id === targetFolderId);
+        if (!folder) return;
+
+        // 导出该文件夹内的单词数组
+        const jsonStr = JSON.stringify(folder.words, null, 2);
+        downloadFile(jsonStr, `${folder.name}_words.json`);
+        closeModal('modalFolderOptions');
+    }
+
+    function downloadFile(content, fileName) {
+        const blob = new Blob([content], { type: "application/json" });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = fileName;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    }
+
+    // --- 学习、发音、导入逻辑 (保留 v4.1 的修复) ---
     function createFolder() {
         const name = document.getElementById('newFolderName').value.trim();
         if (!name) return;
@@ -272,15 +341,12 @@
     function renderCard() {
         if (studyQueue.length === 0) { showEmptyCard(); return; }
         const item = studyQueue[currentCardIndex];
-        
         document.getElementById('front-word').textContent = item.word;
         document.getElementById('front-phonetic').textContent = item.phonetic || "";
-        
         document.getElementById('back-word').textContent = item.word;
         document.getElementById('back-phonetic').textContent = item.phonetic || "";
         document.getElementById('back-def').textContent = item.definition;
         document.getElementById('back-sentence').textContent = item.sentence;
-
         isFlipped = false;
         document.getElementById('flashcard').classList.remove('is-flipped');
     }
@@ -293,27 +359,17 @@
         if(isFlipped) playAudio();
     }
 
-    // --- 核心修复：发音逻辑优化 ---
     function playAudio(e) {
         if(e) e.stopPropagation();
         if (studyQueue.length === 0) return;
-
-        // 1. 强制停止上一个音频，防止队列堆积
         window.speechSynthesis.cancel();
-
         const text = studyQueue[currentCardIndex].word;
-        // 2. 技巧：在单词前加一个空格，让手机扬声器有时间完成“淡入”过程，防止吞掉第一个音节
-        const utterance = new SpeechSynthesisUtterance(" " + text);
-
+        const utterance = new SpeechSynthesisUtterance(" " + text); // 空格修复吞字
         const voices = window.speechSynthesis.getVoices();
         const usVoice = voices.find(v => v.lang === 'en-US');
         if (usVoice) utterance.voice = usVoice;
         utterance.rate = 0.9;
-        
-        // 3. 技巧：设置一个微小的延迟(50ms)，确保 cancel() 命令已完全执行且音频通道已打开
-        setTimeout(() => {
-            window.speechSynthesis.speak(utterance);
-        }, 50);
+        setTimeout(() => { window.speechSynthesis.speak(utterance); }, 50); // 延迟修复吞字
     }
 
     function nextCard(known) {
@@ -321,11 +377,7 @@
         if (!known) studyQueue.push(studyQueue[currentCardIndex]);
         currentCardIndex = (currentCardIndex + 1) % studyQueue.length;
         renderCard();
-        
-        // 自动播放时也加入稍长的延迟
-        setTimeout(() => { 
-            if(!isFlipped) playAudio(null); 
-        }, 400); 
+        setTimeout(() => { if(!isFlipped) playAudio(null); }, 400); 
     }
 
     function openImportModal() {
@@ -359,16 +411,23 @@
         } catch (e) { alert("格式错误：" + e.message); }
     }
 
+    // --- 全局设置逻辑 ---
     function openGlobalSettings() { document.getElementById('modalSettings').classList.add('open'); }
-    function exportData() {
-        const blob = new Blob([JSON.stringify(appData, null, 2)], { type: "application/json" });
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = `my_vocabulary_${new Date().toISOString().slice(0,10)}.json`;
-        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    
+    function exportGlobalData() {
+        const jsonStr = JSON.stringify(appData, null, 2);
+        downloadFile(jsonStr, `my_vocabulary_FULL_BACKUP_${new Date().toISOString().slice(0,10)}.json`);
     }
+
     function clearAllData() {
-        if(confirm("确定要清空所有数据吗？")) { localStorage.removeItem('myWords'); location.reload(); }
+        if(confirm("确定要清空所有数据吗？此操作不可逆！")) { localStorage.removeItem('myWords'); location.reload(); }
+    }
+    
+    // --- 通用功能 ---
+    function openCreateFolder() {
+        document.getElementById('modalCreateFolder').classList.add('open');
+        document.getElementById('newFolderName').value = '';
+        document.getElementById('newFolderName').focus();
     }
     function closeModal(id) { document.getElementById(id).classList.remove('open'); }
 </script>
