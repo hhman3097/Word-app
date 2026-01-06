@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>单词卡片 v5.0</title>
+    <title>单词卡片 v5.2</title>
     <style>
         :root {
             --primary: #2563eb;
@@ -44,17 +44,12 @@
             transition: transform 0.1s; position: relative;
         }
         .folder-card:active { transform: scale(0.98); }
-        .folder-info { flex: 1; } /* 让文字区域占据剩余空间 */
+        .folder-info { flex: 1; }
         .folder-info h3 { font-size: 1.1rem; margin-bottom: 4px; }
         .folder-info p { font-size: 0.85rem; color: var(--text-sub); }
-        
-        /* 文件夹右侧的操作区 */
         .folder-actions { display: flex; align-items: center; gap: 10px; }
+        .more-btn { padding: 8px 12px; font-size: 1.2rem; color: #64748b; background: #f1f5f9; border-radius: 8px; z-index: 5; }
         .folder-arrow { color: #cbd5e1; font-size: 1.2rem; }
-        .more-btn { 
-            padding: 8px 12px; font-size: 1.2rem; color: #64748b; background: #f1f5f9; 
-            border-radius: 8px; z-index: 5; 
-        }
 
         .fab { position: absolute; bottom: 30px; right: 30px; width: 56px; height: 56px; background: var(--primary); color: white; border-radius: 50%; font-size: 2rem; display: flex; justify-content: center; align-items: center; box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.4); z-index: 10; }
 
@@ -165,7 +160,6 @@
             <button onclick="closeModal('modalFolderOptions')" style="font-size:1.5rem;background:none">×</button>
         </div>
         <p style="font-size:0.9rem; color:#64748b; margin-bottom:15px">对该生词本进行操作：</p>
-        
         <button class="btn-block btn-primary" onclick="exportSingleFolder()">⬇️ 导出本文件夹 (JSON)</button>
         <div style="height:10px"></div>
         <button class="btn-block btn-danger-outline" onclick="deleteSingleFolder()">🗑️ 删除本文件夹</button>
@@ -204,7 +198,7 @@
 <script>
     let appData = [];
     let currentFolderId = null;
-    let targetFolderId = null; // 用于存储正在操作(删除/导出)的文件夹ID
+    let targetFolderId = null;
     let studyQueue = [];
     let currentCardIndex = 0;
     let isFlipped = false;
@@ -236,7 +230,6 @@
         renderHome();
     }
 
-    // --- 首页逻辑 (更新) ---
     function renderHome() {
         const list = document.getElementById('folderList');
         list.innerHTML = '';
@@ -244,18 +237,12 @@
             list.innerHTML = `<div class="empty-state">还没有文件夹，点击右下角 + 创建</div>`;
             return;
         }
-        
         appData.forEach(folder => {
             const div = document.createElement('div');
             div.className = 'folder-card';
-            // 点击整个卡片打开文件夹
             div.onclick = () => openFolder(folder.id);
-            
             div.innerHTML = `
-                <div class="folder-info">
-                    <h3>📁 ${folder.name}</h3>
-                    <p>${folder.words.length} 个单词</p>
-                </div>
+                <div class="folder-info"><h3>📁 ${folder.name}</h3><p>${folder.words.length} 个单词</p></div>
                 <div class="folder-actions">
                     <button class="more-btn" onclick="openFolderOptions('${folder.id}', '${folder.name}', event)">⋮</button>
                     <div class="folder-arrow">›</div>
@@ -265,9 +252,8 @@
         });
     }
 
-    // --- 单文件夹操作逻辑 (新增) ---
     function openFolderOptions(id, name, event) {
-        event.stopPropagation(); // 关键：阻止进入文件夹
+        event.stopPropagation();
         targetFolderId = id;
         document.getElementById('optFolderName').textContent = name;
         document.getElementById('modalFolderOptions').classList.add('open');
@@ -275,7 +261,7 @@
 
     function deleteSingleFolder() {
         if (!targetFolderId) return;
-        if (confirm("确定要删除这个文件夹吗？里面的单词也会消失。")) {
+        if (confirm("确定要删除这个文件夹吗？")) {
             appData = appData.filter(f => f.id !== targetFolderId);
             saveToLocal();
             closeModal('modalFolderOptions');
@@ -286,8 +272,6 @@
         if (!targetFolderId) return;
         const folder = appData.find(f => f.id === targetFolderId);
         if (!folder) return;
-
-        // 导出该文件夹内的单词数组
         const jsonStr = JSON.stringify(folder.words, null, 2);
         downloadFile(jsonStr, `${folder.name}_words.json`);
         closeModal('modalFolderOptions');
@@ -301,7 +285,6 @@
         document.body.appendChild(a); a.click(); document.body.removeChild(a);
     }
 
-    // --- 学习、发音、导入逻辑 (保留 v4.1 的修复) ---
     function createFolder() {
         const name = document.getElementById('newFolderName').value.trim();
         if (!name) return;
@@ -359,17 +342,25 @@
         if(isFlipped) playAudio();
     }
 
+    // --- 【修复】回滚至 v4.1 的发音逻辑 ---
     function playAudio(e) {
         if(e) e.stopPropagation();
         if (studyQueue.length === 0) return;
+
         window.speechSynthesis.cancel();
+        
         const text = studyQueue[currentCardIndex].word;
-        const utterance = new SpeechSynthesisUtterance(" " + text); // 空格修复吞字
+        const utterance = new SpeechSynthesisUtterance(" " + text); // 依然保留空格
+        
         const voices = window.speechSynthesis.getVoices();
         const usVoice = voices.find(v => v.lang === 'en-US');
         if (usVoice) utterance.voice = usVoice;
         utterance.rate = 0.9;
-        setTimeout(() => { window.speechSynthesis.speak(utterance); }, 50); // 延迟修复吞字
+        
+        // 关键修复：恢复使用 setTimeout 延时，这是解决你手机吞音的关键
+        setTimeout(() => {
+            window.speechSynthesis.speak(utterance);
+        }, 50);
     }
 
     function nextCard(known) {
@@ -377,6 +368,7 @@
         if (!known) studyQueue.push(studyQueue[currentCardIndex]);
         currentCardIndex = (currentCardIndex + 1) % studyQueue.length;
         renderCard();
+        // 自动播放时给予更充足的延时
         setTimeout(() => { if(!isFlipped) playAudio(null); }, 400); 
     }
 
@@ -411,19 +403,14 @@
         } catch (e) { alert("格式错误：" + e.message); }
     }
 
-    // --- 全局设置逻辑 ---
     function openGlobalSettings() { document.getElementById('modalSettings').classList.add('open'); }
-    
     function exportGlobalData() {
         const jsonStr = JSON.stringify(appData, null, 2);
         downloadFile(jsonStr, `my_vocabulary_FULL_BACKUP_${new Date().toISOString().slice(0,10)}.json`);
     }
-
     function clearAllData() {
         if(confirm("确定要清空所有数据吗？此操作不可逆！")) { localStorage.removeItem('myWords'); location.reload(); }
     }
-    
-    // --- 通用功能 ---
     function openCreateFolder() {
         document.getElementById('modalCreateFolder').classList.add('open');
         document.getElementById('newFolderName').value = '';
